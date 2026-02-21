@@ -142,7 +142,7 @@ Optional lifecycle hooks are available via `on_start(container)` and `on_stop(co
 | `gherkin-testcontainers-oracle` | Oracle | `oracledb` connection |
 | `gherkin-testcontainers-playwright` | Playwright browser (no Docker) | `playwright.sync_api.Page` |
 | `gherkin-testcontainers-google-pubsub` | Google Cloud Pub/Sub emulator | `google.cloud.pubsub_v1.PublisherClient` |
-| `gherkin-testcontainers-iggy` | Iggy message streaming | `iggy.client.IggyClient` |
+| `gherkin-testcontainers-iggy` | Iggy message streaming | `iggy_py.IggyClient` |
 
 ## Playwright Integration
 

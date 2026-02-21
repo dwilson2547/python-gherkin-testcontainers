@@ -22,7 +22,7 @@ class IggyPlugin(ContainerPlugin):
         return container
 
     def get_client(self, container: DockerContainer) -> Any:
-        from iggy.client import IggyClient
+        from iggy_py import IggyClient
         host = container.get_container_host_ip()
         port = container.get_exposed_port(IGGY_TCP_PORT)
         return IggyClient(host=host, port=int(port))

@@ -45,3 +45,21 @@ def test_iggy_plugin_create_container_custom_image():
         mock_instance.with_exposed_ports.assert_called_once_with(
             IGGY_HTTP_PORT, IGGY_TCP_PORT
         )
+
+
+def test_iggy_plugin_get_client_returns_iggy_client():
+    plugin = IggyPlugin()
+    mock_container = MagicMock()
+    mock_container.get_container_host_ip.return_value = "localhost"
+    mock_container.get_exposed_port.return_value = "12345"
+
+    with patch("iggy_py.IggyClient") as MockIggyClient:
+        mock_client = MagicMock()
+        MockIggyClient.return_value = mock_client
+
+        client = plugin.get_client(mock_container)
+
+        mock_container.get_container_host_ip.assert_called_once()
+        mock_container.get_exposed_port.assert_called_once_with(IGGY_TCP_PORT)
+        MockIggyClient.assert_called_once_with(host="localhost", port=12345)
+        assert client is mock_client

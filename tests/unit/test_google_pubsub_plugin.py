@@ -21,3 +21,15 @@ def test_google_pubsub_plugin_create_container():
     ) as MockContainer:
         plugin.create_container(project="test-project")
         MockContainer.assert_called_once_with(project="test-project")
+
+
+def test_google_pubsub_plugin_get_client_returns_publisher():
+    plugin = GooglePubSubPlugin()
+    mock_container = MagicMock()
+    mock_publisher = MagicMock()
+    mock_container.get_publisher.return_value = mock_publisher
+
+    client = plugin.get_client(mock_container)
+
+    mock_container.get_publisher.assert_called_once()
+    assert client is mock_publisher
