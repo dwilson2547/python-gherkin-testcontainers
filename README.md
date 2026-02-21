@@ -12,6 +12,7 @@ pip install gherkin-testcontainers-postgres
 pip install gherkin-testcontainers-sqlite
 pip install gherkin-testcontainers-mariadb
 pip install gherkin-testcontainers-oracle
+pip install gherkin-testcontainers-playwright
 ```
 
 ## Quick Start
@@ -137,6 +138,59 @@ Optional lifecycle hooks are available via `on_start(container)` and `on_stop(co
 | `gherkin-testcontainers-sqlite` | SQLite (no Docker) | `sqlite3.Connection` |
 | `gherkin-testcontainers-mariadb` | MariaDB | SQLAlchemy connection |
 | `gherkin-testcontainers-oracle` | Oracle | `oracledb` connection |
+| `gherkin-testcontainers-playwright` | Playwright browser (no Docker) | `playwright.sync_api.Page` |
+
+## Playwright Integration
+
+The `playwright` plugin lets you drive a real browser inside BDD scenarios. It does not require Docker — it manages a [Playwright](https://playwright.dev/python/) browser instance directly. Combine it with other container plugins to spin up a backend or UI container, then use Playwright to test flows through the site.
+
+### Installation
+
+```bash
+pip install gherkin-testcontainers-playwright
+playwright install  # downloads browser binaries
+```
+
+### Example
+
+```gherkin
+# features/ui.feature
+Feature: UI smoke test
+
+  Scenario: Home page loads
+    Given a running web app
+    When I open the home page
+    Then I should see the title "My App"
+```
+
+```python
+# features/steps/ui_steps.py
+from behave import given, when, then
+from gherkin_testcontainers import use_container
+
+@given("a running web app")
+@use_container("playwright", browser_type="chromium", headless=True)
+def step_running_app(context, playwright_client):
+    # playwright_client is a playwright.sync_api.Page
+    context.page = playwright_client
+
+@when("I open the home page")
+def step_open_home(context):
+    context.page.goto("http://localhost:8080")
+
+@then('I should see the title "{title}"')
+def step_check_title(context, title):
+    assert context.page.title() == title
+```
+
+Supported `@use_container` kwargs:
+
+| Kwarg | Default | Description |
+|-------|---------|-------------|
+| `browser_type` | `"chromium"` | Browser to launch: `"chromium"`, `"firefox"`, or `"webkit"` |
+| `headless` | `True` | Run headlessly (no visible window) |
+| `slow_mo` | — | Milliseconds to slow each operation (useful for debugging) |
+| any other kwarg | — | Forwarded directly to `browser.launch()` |
 
 ## Development
 

@@ -1,0 +1,16 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gherkin-testcontainers-playwright"
+version = "0.1.0"
+description = "Playwright plugin for gherkin-testcontainers"
+requires-python = ">=3.11"
+dependencies = [
+    "gherkin-testcontainers>=0.1.0",
+    "playwright>=1.0,<2.0",
+]
+
+[project.entry-points."gherkin_testcontainers.plugins"]
+playwright = "gherkin_testcontainers_playwright:PlaywrightPlugin"
