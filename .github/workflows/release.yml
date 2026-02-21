@@ -1,0 +1,152 @@
+name: Release
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
+
+jobs:
+  tag-and-release:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+      tag_created: ${{ steps.create-tag.outputs.tag_created }}
+      has_dockerhub_creds: ${{ steps.check-creds.outputs.has_creds }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version from pyproject.toml
+        id: get-version
+        run: |
+          VERSION=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create tag
+        id: create-tag
+        run: |
+          if git ls-remote --tags origin "refs/tags/v${{ steps.get-version.outputs.version }}" | grep -q "refs/tags"; then
+            echo "Tag v${{ steps.get-version.outputs.version }} already exists, skipping release"
+            echo "tag_created=false" >> $GITHUB_OUTPUT
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag "v${{ steps.get-version.outputs.version }}"
+            git push origin "v${{ steps.get-version.outputs.version }}"
+            echo "tag_created=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub release
+        if: steps.create-tag.outputs.tag_created == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${{ steps.get-version.outputs.version }}" \
+            --title "Release v${{ steps.get-version.outputs.version }}" \
+            --generate-notes
+
+      - name: Check DockerHub credentials
+        id: check-creds
+        run: |
+          if [ -n "$DOCKERHUB_USERNAME" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
+            echo "has_creds=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_creds=false" >> $GITHUB_OUTPUT
+          fi
+
+  publish-docker:
+    needs: tag-and-release
+    permissions:
+      contents: read
+    if: needs.tag-and-release.outputs.tag_created == 'true' && needs.tag-and-release.outputs.has_dockerhub_creds == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        module:
+          - name: core
+            dockerfile: Dockerfile
+            image: gherkin-testcontainers
+          - name: sqlite
+            dockerfile: plugins/sqlite/Dockerfile
+            image: gherkin-testcontainers-sqlite
+          - name: postgres
+            dockerfile: plugins/postgres/Dockerfile
+            image: gherkin-testcontainers-postgres
+          - name: oracle
+            dockerfile: plugins/oracle/Dockerfile
+            image: gherkin-testcontainers-oracle
+          - name: mariadb
+            dockerfile: plugins/mariadb/Dockerfile
+            image: gherkin-testcontainers-mariadb
+      fail-fast: false
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and push Docker image
+        run: |
+          if [ -f "${{ matrix.module.dockerfile }}" ]; then
+            echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            docker build -t "${{ matrix.module.image }}:release" -f "${{ matrix.module.dockerfile }}" .
+            VERSION="${{ needs.tag-and-release.outputs.version }}"
+            docker tag "${{ matrix.module.image }}:release" "$DOCKERHUB_USERNAME/${{ matrix.module.image }}:$VERSION"
+            docker tag "${{ matrix.module.image }}:release" "$DOCKERHUB_USERNAME/${{ matrix.module.image }}:latest"
+            docker push "$DOCKERHUB_USERNAME/${{ matrix.module.image }}:$VERSION"
+            docker push "$DOCKERHUB_USERNAME/${{ matrix.module.image }}:latest"
+          else
+            echo "No Dockerfile found for ${{ matrix.module.name }}, skipping Docker publish"
+          fi
+
+  publish-helm:
+    needs: tag-and-release
+    permissions:
+      contents: read
+    if: needs.tag-and-release.outputs.tag_created == 'true' && needs.tag-and-release.outputs.has_dockerhub_creds == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        module:
+          - name: core
+            chart_dir: charts/gherkin-testcontainers
+          - name: sqlite
+            chart_dir: charts/gherkin-testcontainers-sqlite
+          - name: postgres
+            chart_dir: charts/gherkin-testcontainers-postgres
+          - name: oracle
+            chart_dir: charts/gherkin-testcontainers-oracle
+          - name: mariadb
+            chart_dir: charts/gherkin-testcontainers-mariadb
+      fail-fast: false
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Publish Helm chart
+        run: |
+          CHART_FILE="${{ matrix.module.chart_dir }}/Chart.yaml"
+          if [ -f "$CHART_FILE" ]; then
+            echo "$DOCKERHUB_TOKEN" | helm registry login registry-1.docker.io -u "$DOCKERHUB_USERNAME" --password-stdin
+            PKG_OUTPUT=$(helm package "${{ matrix.module.chart_dir }}")
+            CHART_PACKAGE=$(echo "$PKG_OUTPUT" | grep -oP '(?<=Successfully packaged chart and saved it to: ).*')
+            helm push "$CHART_PACKAGE" "oci://registry-1.docker.io/$DOCKERHUB_USERNAME"
+          else
+            echo "No Helm chart found for ${{ matrix.module.name }}, skipping Helm publish"
+          fi

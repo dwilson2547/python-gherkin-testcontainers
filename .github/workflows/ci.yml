@@ -1,0 +1,318 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - '**'
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      core: ${{ steps.filter.outputs.core }}
+      sqlite: ${{ steps.filter.outputs.sqlite }}
+      postgres: ${{ steps.filter.outputs.postgres }}
+      oracle: ${{ steps.filter.outputs.oracle }}
+      mariadb: ${{ steps.filter.outputs.mariadb }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            core:
+              - 'src/**'
+              - 'pyproject.toml'
+              - 'tests/**'
+            sqlite:
+              - 'plugins/sqlite/**'
+            postgres:
+              - 'plugins/postgres/**'
+            oracle:
+              - 'plugins/oracle/**'
+            mariadb:
+              - 'plugins/mariadb/**'
+
+  build-core:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.core == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+      - name: Run tests
+        run: pytest tests/unit/ -v -k "not (sqlite or postgres or oracle or mariadb)"
+      - name: Build Docker image
+        run: |
+          if [ -f "Dockerfile" ]; then
+            docker build -t gherkin-testcontainers:ci .
+          else
+            echo "No Dockerfile found for core, skipping Docker build"
+          fi
+      - name: Push Docker image to DockerHub
+        if: env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != ''
+        run: |
+          if [ -f "Dockerfile" ]; then
+            echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            docker tag gherkin-testcontainers:ci "$DOCKERHUB_USERNAME/gherkin-testcontainers:${{ github.sha }}"
+            docker push "$DOCKERHUB_USERNAME/gherkin-testcontainers:${{ github.sha }}"
+          fi
+      - name: Package Helm chart
+        run: |
+          if [ -f "charts/gherkin-testcontainers/Chart.yaml" ]; then
+            helm package charts/gherkin-testcontainers
+          else
+            echo "No Helm chart found for core, skipping"
+          fi
+      - name: Publish Helm chart
+        if: env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != ''
+        run: |
+          if [ -f "charts/gherkin-testcontainers/Chart.yaml" ]; then
+            echo "$DOCKERHUB_TOKEN" | helm registry login registry-1.docker.io -u "$DOCKERHUB_USERNAME" --password-stdin
+            helm push gherkin-testcontainers-*.tgz "oci://registry-1.docker.io/$DOCKERHUB_USERNAME"
+          fi
+
+  build-sqlite:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.sqlite == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+          pip install -e plugins/sqlite
+      - name: Run tests
+        run: pytest tests/unit/test_sqlite_plugin.py -v
+      - name: Build Docker image
+        run: |
+          if [ -f "plugins/sqlite/Dockerfile" ]; then
+            docker build -t gherkin-testcontainers-sqlite:ci -f plugins/sqlite/Dockerfile .
+          else
+            echo "No Dockerfile found for sqlite, skipping Docker build"
+          fi
+      - name: Push Docker image to DockerHub
+        if: env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != ''
+        run: |
+          if [ -f "plugins/sqlite/Dockerfile" ]; then
+            echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            docker tag gherkin-testcontainers-sqlite:ci "$DOCKERHUB_USERNAME/gherkin-testcontainers-sqlite:${{ github.sha }}"
+            docker push "$DOCKERHUB_USERNAME/gherkin-testcontainers-sqlite:${{ github.sha }}"
+          fi
+      - name: Package Helm chart
+        run: |
+          if [ -f "charts/gherkin-testcontainers-sqlite/Chart.yaml" ]; then
+            helm package charts/gherkin-testcontainers-sqlite
+          else
+            echo "No Helm chart found for sqlite, skipping"
+          fi
+      - name: Publish Helm chart
+        if: env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != ''
+        run: |
+          if [ -f "charts/gherkin-testcontainers-sqlite/Chart.yaml" ]; then
+            echo "$DOCKERHUB_TOKEN" | helm registry login registry-1.docker.io -u "$DOCKERHUB_USERNAME" --password-stdin
+            helm push gherkin-testcontainers-sqlite-*.tgz "oci://registry-1.docker.io/$DOCKERHUB_USERNAME"
+          fi
+
+  build-postgres:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.postgres == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+          pip install -e plugins/postgres
+      - name: Run tests
+        run: pytest tests/unit/test_postgres_plugin.py -v
+      - name: Build Docker image
+        run: |
+          if [ -f "plugins/postgres/Dockerfile" ]; then
+            docker build -t gherkin-testcontainers-postgres:ci -f plugins/postgres/Dockerfile .
+          else
+            echo "No Dockerfile found for postgres, skipping Docker build"
+          fi
+      - name: Push Docker image to DockerHub
+        if: env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != ''
+        run: |
+          if [ -f "plugins/postgres/Dockerfile" ]; then
+            echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            docker tag gherkin-testcontainers-postgres:ci "$DOCKERHUB_USERNAME/gherkin-testcontainers-postgres:${{ github.sha }}"
+            docker push "$DOCKERHUB_USERNAME/gherkin-testcontainers-postgres:${{ github.sha }}"
+          fi
+      - name: Package Helm chart
+        run: |
+          if [ -f "charts/gherkin-testcontainers-postgres/Chart.yaml" ]; then
+            helm package charts/gherkin-testcontainers-postgres
+          else
+            echo "No Helm chart found for postgres, skipping"
+          fi
+      - name: Publish Helm chart
+        if: env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != ''
+        run: |
+          if [ -f "charts/gherkin-testcontainers-postgres/Chart.yaml" ]; then
+            echo "$DOCKERHUB_TOKEN" | helm registry login registry-1.docker.io -u "$DOCKERHUB_USERNAME" --password-stdin
+            helm push gherkin-testcontainers-postgres-*.tgz "oci://registry-1.docker.io/$DOCKERHUB_USERNAME"
+          fi
+
+  build-oracle:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.oracle == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+          pip install -e plugins/oracle
+      - name: Run tests
+        run: pytest tests/unit/test_oracle_plugin.py -v
+      - name: Build Docker image
+        run: |
+          if [ -f "plugins/oracle/Dockerfile" ]; then
+            docker build -t gherkin-testcontainers-oracle:ci -f plugins/oracle/Dockerfile .
+          else
+            echo "No Dockerfile found for oracle, skipping Docker build"
+          fi
+      - name: Push Docker image to DockerHub
+        if: env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != ''
+        run: |
+          if [ -f "plugins/oracle/Dockerfile" ]; then
+            echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            docker tag gherkin-testcontainers-oracle:ci "$DOCKERHUB_USERNAME/gherkin-testcontainers-oracle:${{ github.sha }}"
+            docker push "$DOCKERHUB_USERNAME/gherkin-testcontainers-oracle:${{ github.sha }}"
+          fi
+      - name: Package Helm chart
+        run: |
+          if [ -f "charts/gherkin-testcontainers-oracle/Chart.yaml" ]; then
+            helm package charts/gherkin-testcontainers-oracle
+          else
+            echo "No Helm chart found for oracle, skipping"
+          fi
+      - name: Publish Helm chart
+        if: env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != ''
+        run: |
+          if [ -f "charts/gherkin-testcontainers-oracle/Chart.yaml" ]; then
+            echo "$DOCKERHUB_TOKEN" | helm registry login registry-1.docker.io -u "$DOCKERHUB_USERNAME" --password-stdin
+            helm push gherkin-testcontainers-oracle-*.tgz "oci://registry-1.docker.io/$DOCKERHUB_USERNAME"
+          fi
+
+  build-mariadb:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.mariadb == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+          pip install -e plugins/mariadb
+      - name: Run tests
+        run: pytest tests/unit/test_mariadb_plugin.py -v
+      - name: Build Docker image
+        run: |
+          if [ -f "plugins/mariadb/Dockerfile" ]; then
+            docker build -t gherkin-testcontainers-mariadb:ci -f plugins/mariadb/Dockerfile .
+          else
+            echo "No Dockerfile found for mariadb, skipping Docker build"
+          fi
+      - name: Push Docker image to DockerHub
+        if: env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != ''
+        run: |
+          if [ -f "plugins/mariadb/Dockerfile" ]; then
+            echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            docker tag gherkin-testcontainers-mariadb:ci "$DOCKERHUB_USERNAME/gherkin-testcontainers-mariadb:${{ github.sha }}"
+            docker push "$DOCKERHUB_USERNAME/gherkin-testcontainers-mariadb:${{ github.sha }}"
+          fi
+      - name: Package Helm chart
+        run: |
+          if [ -f "charts/gherkin-testcontainers-mariadb/Chart.yaml" ]; then
+            helm package charts/gherkin-testcontainers-mariadb
+          else
+            echo "No Helm chart found for mariadb, skipping"
+          fi
+      - name: Publish Helm chart
+        if: env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != ''
+        run: |
+          if [ -f "charts/gherkin-testcontainers-mariadb/Chart.yaml" ]; then
+            echo "$DOCKERHUB_TOKEN" | helm registry login registry-1.docker.io -u "$DOCKERHUB_USERNAME" --password-stdin
+            helm push gherkin-testcontainers-mariadb-*.tgz "oci://registry-1.docker.io/$DOCKERHUB_USERNAME"
+          fi
+
+  ci:
+    if: always()
+    permissions:
+      contents: read
+    needs:
+      - build-core
+      - build-sqlite
+      - build-postgres
+      - build-oracle
+      - build-mariadb
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check CI results
+        run: |
+          results=(
+            "${{ needs.build-core.result }}"
+            "${{ needs.build-sqlite.result }}"
+            "${{ needs.build-postgres.result }}"
+            "${{ needs.build-oracle.result }}"
+            "${{ needs.build-mariadb.result }}"
+          )
+          for result in "${results[@]}"; do
+            if [ "$result" == "failure" ] || [ "$result" == "cancelled" ]; then
+              echo "CI failed: one or more jobs did not pass"
+              exit 1
+            fi
+          done
+          echo "CI passed"
