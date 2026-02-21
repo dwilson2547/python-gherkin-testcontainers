@@ -13,6 +13,8 @@ pip install gherkin-testcontainers-sqlite
 pip install gherkin-testcontainers-mariadb
 pip install gherkin-testcontainers-oracle
 pip install gherkin-testcontainers-playwright
+pip install gherkin-testcontainers-kafka
+pip install gherkin-testcontainers-pulsar
 ```
 
 ## Quick Start
@@ -92,7 +94,7 @@ gherkin-testcontainers core
   ├── @use_container    (step decorator, client injection)
   └── PluginRegistry    (entry_points auto-discovery)
          |
-Plugins (postgres, sqlite, mariadb, oracle, ...)
+Plugins (postgres, sqlite, mariadb, oracle, kafka, pulsar, ...)
 Each implements ContainerPlugin ABC
          |
 testcontainers-python / Docker
@@ -139,6 +141,8 @@ Optional lifecycle hooks are available via `on_start(container)` and `on_stop(co
 | `gherkin-testcontainers-mariadb` | MariaDB | SQLAlchemy connection |
 | `gherkin-testcontainers-oracle` | Oracle | `oracledb` connection |
 | `gherkin-testcontainers-playwright` | Playwright browser (no Docker) | `playwright.sync_api.Page` |
+| `gherkin-testcontainers-kafka` | Apache Kafka | `kafka.KafkaProducer` |
+| `gherkin-testcontainers-pulsar` | Apache Pulsar | `pulsar.Client` |
 
 ## Playwright Integration
 
@@ -192,6 +196,104 @@ Supported `@use_container` kwargs:
 | `slow_mo` | — | Milliseconds to slow each operation (useful for debugging) |
 | any other kwarg | — | Forwarded directly to `browser.launch()` |
 
+## Kafka Integration
+
+The `kafka` plugin spins up a [Confluent Kafka](https://hub.docker.com/r/confluentinc/cp-kafka) container and injects a `kafka.KafkaProducer` client. Use the producer to publish messages in your scenarios; create a `KafkaConsumer` from the same `bootstrap_servers` to verify consumption.
+
+### Installation
+
+```bash
+pip install gherkin-testcontainers-kafka
+```
+
+### Example
+
+```gherkin
+# features/messaging.feature
+Feature: Kafka messaging
+
+  Scenario: Publish a message
+    Given a running Kafka broker
+    When I send the message "hello"
+    Then the topic "greetings" should contain the message
+```
+
+```python
+# features/steps/messaging_steps.py
+from behave import given, when, then
+from gherkin_testcontainers import use_container
+from kafka import KafkaConsumer
+
+@given("a running Kafka broker")
+@use_container("kafka")
+def step_kafka(context, kafka_client):
+    # kafka_client is a kafka.KafkaProducer
+    context.producer = kafka_client
+    context.bootstrap_servers = kafka_client.config["bootstrap_servers"]
+
+@when('I send the message "{msg}"')
+def step_send(context, msg):
+    context.producer.send("greetings", msg.encode())
+    context.producer.flush()
+
+@then('the topic "{topic}" should contain the message')
+def step_check(context, topic):
+    consumer = KafkaConsumer(
+        topic,
+        bootstrap_servers=context.bootstrap_servers,
+        auto_offset_reset="earliest",
+        consumer_timeout_ms=5000,
+    )
+    messages = [m.value for m in consumer]
+    assert len(messages) > 0
+```
+
+## Pulsar Integration
+
+The `pulsar` plugin starts an [Apache Pulsar](https://hub.docker.com/r/apachepulsar/pulsar) standalone container and injects a `pulsar.Client`. Use it to create producers and consumers in your scenarios.
+
+### Installation
+
+```bash
+pip install gherkin-testcontainers-pulsar
+```
+
+### Example
+
+```gherkin
+# features/pubsub.feature
+Feature: Pulsar pub/sub
+
+  Scenario: Publish and consume a message
+    Given a running Pulsar broker
+    When I publish "hello" to topic "my-topic"
+    Then I should receive "hello" from topic "my-topic"
+```
+
+```python
+# features/steps/pubsub_steps.py
+from behave import given, when, then
+from gherkin_testcontainers import use_container
+
+@given("a running Pulsar broker")
+@use_container("pulsar")
+def step_pulsar(context, pulsar_client):
+    # pulsar_client is a pulsar.Client
+    context.pulsar = pulsar_client
+
+@when('I publish "{msg}" to topic "{topic}"')
+def step_publish(context, msg, topic):
+    producer = context.pulsar.create_producer(topic)
+    producer.send(msg.encode())
+
+@then('I should receive "{msg}" from topic "{topic}"')
+def step_consume(context, msg, topic):
+    consumer = context.pulsar.subscribe(topic, "test-sub")
+    received = consumer.receive(timeout_millis=5000)
+    assert received.data().decode() == msg
+    consumer.acknowledge(received)
+```
+
 ## Development
 
 ```bash
@@ -199,7 +301,7 @@ git clone <repo>
 cd gherkin-testcontainers
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-pip install -e plugins/sqlite -e plugins/postgres -e plugins/mariadb --no-deps -e plugins/oracle
+pip install -e plugins/sqlite -e plugins/postgres -e plugins/mariadb --no-deps -e plugins/oracle -e plugins/kafka -e plugins/pulsar
 
 # Run tests
 pytest tests/unit/ -v
