@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gherkin-testcontainers-pulsar"
+version = "0.1.0"
+description = "Pulsar plugin for gherkin-testcontainers"
+requires-python = ">=3.11"
+dependencies = [
+    "gherkin-testcontainers>=0.1.0",
+    "testcontainers>=4.0.0",
+    "pulsar-client>=3.0",
+]
+
+[project.entry-points."gherkin_testcontainers.plugins"]
+pulsar = "gherkin_testcontainers_pulsar:PulsarPlugin"

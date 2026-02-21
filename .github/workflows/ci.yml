@@ -18,6 +18,8 @@ jobs:
       oracle: ${{ steps.filter.outputs.oracle }}
       mariadb: ${{ steps.filter.outputs.mariadb }}
       playwright: ${{ steps.filter.outputs.playwright }}
+      kafka: ${{ steps.filter.outputs.kafka }}
+      pulsar: ${{ steps.filter.outputs.pulsar }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,6 +42,10 @@ jobs:
               - 'plugins/mariadb/**'
             playwright:
               - 'plugins/playwright/**'
+            kafka:
+              - 'plugins/kafka/**'
+            pulsar:
+              - 'plugins/pulsar/**'
 
   build-core:
     needs: detect-changes
@@ -55,7 +61,7 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
       - name: Run tests
-        run: pytest tests/unit/ -v --ignore=tests/unit/test_sqlite_plugin.py --ignore=tests/unit/test_postgres_plugin.py --ignore=tests/unit/test_oracle_plugin.py --ignore=tests/unit/test_mariadb_plugin.py --ignore=tests/unit/test_playwright_plugin.py
+        run: pytest tests/unit/ -v --ignore=tests/unit/test_sqlite_plugin.py --ignore=tests/unit/test_postgres_plugin.py --ignore=tests/unit/test_oracle_plugin.py --ignore=tests/unit/test_mariadb_plugin.py --ignore=tests/unit/test_playwright_plugin.py --ignore=tests/unit/test_kafka_plugin.py --ignore=tests/unit/test_pulsar_plugin.py
 
   build-sqlite:
     needs: detect-changes
@@ -147,6 +153,42 @@ jobs:
       - name: Run tests
         run: pytest tests/unit/test_playwright_plugin.py -v
 
+  build-kafka:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.kafka == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+          pip install -e plugins/kafka
+      - name: Run tests
+        run: pytest tests/unit/test_kafka_plugin.py -v
+
+  build-pulsar:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.pulsar == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+          pip install -e plugins/pulsar
+      - name: Run tests
+        run: pytest tests/unit/test_pulsar_plugin.py -v
+
   ci:
     if: always()
     permissions:
@@ -158,6 +200,8 @@ jobs:
       - build-oracle
       - build-mariadb
       - build-playwright
+      - build-kafka
+      - build-pulsar
     runs-on: ubuntu-latest
     steps:
       - name: Check CI results
@@ -169,6 +213,8 @@ jobs:
             "${{ needs.build-oracle.result }}"
             "${{ needs.build-mariadb.result }}"
             "${{ needs.build-playwright.result }}"
+            "${{ needs.build-kafka.result }}"
+            "${{ needs.build-pulsar.result }}"
           )
           for result in "${results[@]}"; do
             if [ "$result" == "failure" ] || [ "$result" == "cancelled" ]; then
