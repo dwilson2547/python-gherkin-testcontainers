@@ -1,0 +1,156 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      core: ${{ steps.filter.outputs.core }}
+      sqlite: ${{ steps.filter.outputs.sqlite }}
+      postgres: ${{ steps.filter.outputs.postgres }}
+      oracle: ${{ steps.filter.outputs.oracle }}
+      mariadb: ${{ steps.filter.outputs.mariadb }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            core:
+              - 'src/**'
+              - 'pyproject.toml'
+              - 'tests/**'
+            sqlite:
+              - 'plugins/sqlite/**'
+            postgres:
+              - 'plugins/postgres/**'
+            oracle:
+              - 'plugins/oracle/**'
+            mariadb:
+              - 'plugins/mariadb/**'
+
+  build-core:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.core == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+      - name: Run tests
+        run: pytest tests/unit/ -v -k "not (sqlite or postgres or oracle or mariadb)"
+
+  build-sqlite:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.sqlite == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+          pip install -e plugins/sqlite
+      - name: Run tests
+        run: pytest tests/unit/test_sqlite_plugin.py -v
+
+  build-postgres:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.postgres == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+          pip install -e plugins/postgres
+      - name: Run tests
+        run: pytest tests/unit/test_postgres_plugin.py -v
+
+  build-oracle:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.oracle == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+          pip install -e plugins/oracle
+      - name: Run tests
+        run: pytest tests/unit/test_oracle_plugin.py -v
+
+  build-mariadb:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.mariadb == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+          pip install -e plugins/mariadb
+      - name: Run tests
+        run: pytest tests/unit/test_mariadb_plugin.py -v
+
+  ci:
+    if: always()
+    permissions:
+      contents: read
+    needs:
+      - build-core
+      - build-sqlite
+      - build-postgres
+      - build-oracle
+      - build-mariadb
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check CI results
+        run: |
+          results=(
+            "${{ needs.build-core.result }}"
+            "${{ needs.build-sqlite.result }}"
+            "${{ needs.build-postgres.result }}"
+            "${{ needs.build-oracle.result }}"
+            "${{ needs.build-mariadb.result }}"
+          )
+          for result in "${results[@]}"; do
+            if [ "$result" == "failure" ] || [ "$result" == "cancelled" ]; then
+              echo "CI failed: one or more jobs did not pass"
+              exit 1
+            fi
+          done
+          echo "CI passed"
