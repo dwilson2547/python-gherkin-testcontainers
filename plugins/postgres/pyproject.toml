@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gherkin-testcontainers-postgres"
+version = "0.1.0"
+description = "PostgreSQL plugin for gherkin-testcontainers"
+requires-python = ">=3.11"
+dependencies = [
+    "gherkin-testcontainers>=0.1.0",
+    "testcontainers[postgres]>=4.0.0",
+    "psycopg>=3.0",
+]
+
+[project.entry-points."gherkin_testcontainers.plugins"]
+postgres = "gherkin_testcontainers_postgres:PostgresPlugin"

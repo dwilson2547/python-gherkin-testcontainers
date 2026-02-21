@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gherkin-testcontainers-mariadb"
+version = "0.1.0"
+description = "MariaDB plugin for gherkin-testcontainers"
+requires-python = ">=3.11"
+dependencies = [
+    "gherkin-testcontainers>=0.1.0",
+    "testcontainers[mysql]>=4.0.0",
+    "pymysql>=1.0",
+    "sqlalchemy>=2.0",
+]
+
+[project.entry-points."gherkin_testcontainers.plugins"]
+mariadb = "gherkin_testcontainers_mariadb:MariadbPlugin"

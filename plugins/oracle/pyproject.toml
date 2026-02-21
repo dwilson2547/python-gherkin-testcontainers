@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gherkin-testcontainers-oracle"
+version = "0.1.0"
+description = "Oracle plugin for gherkin-testcontainers"
+requires-python = ">=3.11"
+dependencies = [
+    "gherkin-testcontainers>=0.1.0",
+    "testcontainers[oracle-free]>=4.0.0",
+    "oracledb>=2.0",
+]
+
+[project.entry-points."gherkin_testcontainers.plugins"]
+oracle = "gherkin_testcontainers_oracle:OraclePlugin"

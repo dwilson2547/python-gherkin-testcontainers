@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gherkin-testcontainers-sqlite"
+version = "0.1.0"
+description = "SQLite plugin for gherkin-testcontainers"
+requires-python = ">=3.11"
+dependencies = [
+    "gherkin-testcontainers>=0.1.0",
+]
+
+[project.entry-points."gherkin_testcontainers.plugins"]
+sqlite = "gherkin_testcontainers_sqlite:SqlitePlugin"
