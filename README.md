@@ -13,6 +13,8 @@ pip install gherkin-testcontainers-sqlite
 pip install gherkin-testcontainers-mariadb
 pip install gherkin-testcontainers-oracle
 pip install gherkin-testcontainers-playwright
+pip install gherkin-testcontainers-google-pubsub
+pip install gherkin-testcontainers-iggy
 ```
 
 ## Quick Start
@@ -139,6 +141,8 @@ Optional lifecycle hooks are available via `on_start(container)` and `on_stop(co
 | `gherkin-testcontainers-mariadb` | MariaDB | SQLAlchemy connection |
 | `gherkin-testcontainers-oracle` | Oracle | `oracledb` connection |
 | `gherkin-testcontainers-playwright` | Playwright browser (no Docker) | `playwright.sync_api.Page` |
+| `gherkin-testcontainers-google-pubsub` | Google Cloud Pub/Sub emulator | `google.cloud.pubsub_v1.PublisherClient` |
+| `gherkin-testcontainers-iggy` | Iggy message streaming | `iggy.client.IggyClient` |
 
 ## Playwright Integration
 
@@ -199,7 +203,7 @@ git clone <repo>
 cd gherkin-testcontainers
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-pip install -e plugins/sqlite -e plugins/postgres -e plugins/mariadb --no-deps -e plugins/oracle
+pip install -e plugins/sqlite -e plugins/postgres -e plugins/mariadb --no-deps -e plugins/oracle -e plugins/google_pubsub -e plugins/iggy
 
 # Run tests
 pytest tests/unit/ -v

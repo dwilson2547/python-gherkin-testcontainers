@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gherkin-testcontainers-iggy"
+version = "0.1.0"
+description = "Iggy message streaming plugin for gherkin-testcontainers"
+requires-python = ">=3.11"
+dependencies = [
+    "gherkin-testcontainers>=0.1.0",
+    "testcontainers>=4.0.0",
+    "iggy-py>=0.1",
+]
+
+[project.entry-points."gherkin_testcontainers.plugins"]
+iggy = "gherkin_testcontainers_iggy:IggyPlugin"

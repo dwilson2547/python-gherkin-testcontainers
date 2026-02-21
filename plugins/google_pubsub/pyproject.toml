@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gherkin-testcontainers-google-pubsub"
+version = "0.1.0"
+description = "Google Cloud Pub/Sub plugin for gherkin-testcontainers"
+requires-python = ">=3.11"
+dependencies = [
+    "gherkin-testcontainers>=0.1.0",
+    "testcontainers[google]>=4.0.0",
+    "google-cloud-pubsub>=2.0",
+]
+
+[project.entry-points."gherkin_testcontainers.plugins"]
+google_pubsub = "gherkin_testcontainers_google_pubsub:GooglePubSubPlugin"
