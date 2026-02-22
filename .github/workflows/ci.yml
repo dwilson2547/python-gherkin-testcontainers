@@ -20,6 +20,7 @@ jobs:
       playwright: ${{ steps.filter.outputs.playwright }}
       kafka: ${{ steps.filter.outputs.kafka }}
       pulsar: ${{ steps.filter.outputs.pulsar }}
+      eventhubs: ${{ steps.filter.outputs.eventhubs }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -46,6 +47,8 @@ jobs:
               - 'plugins/kafka/**'
             pulsar:
               - 'plugins/pulsar/**'
+            eventhubs:
+              - 'plugins/eventhubs/**'
 
   build-core:
     needs: detect-changes
@@ -61,7 +64,7 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
       - name: Run tests
-        run: pytest tests/unit/ -v --ignore=tests/unit/test_sqlite_plugin.py --ignore=tests/unit/test_postgres_plugin.py --ignore=tests/unit/test_oracle_plugin.py --ignore=tests/unit/test_mariadb_plugin.py --ignore=tests/unit/test_playwright_plugin.py --ignore=tests/unit/test_kafka_plugin.py --ignore=tests/unit/test_pulsar_plugin.py
+        run: pytest tests/unit/ -v --ignore=tests/unit/test_sqlite_plugin.py --ignore=tests/unit/test_postgres_plugin.py --ignore=tests/unit/test_oracle_plugin.py --ignore=tests/unit/test_mariadb_plugin.py --ignore=tests/unit/test_playwright_plugin.py --ignore=tests/unit/test_kafka_plugin.py --ignore=tests/unit/test_pulsar_plugin.py --ignore=tests/unit/test_eventhubs_plugin.py
 
   build-sqlite:
     needs: detect-changes
@@ -189,6 +192,24 @@ jobs:
       - name: Run tests
         run: pytest tests/unit/test_pulsar_plugin.py -v
 
+  build-eventhubs:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.eventhubs == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+          pip install -e plugins/eventhubs
+      - name: Run tests
+        run: pytest tests/unit/test_eventhubs_plugin.py -v
+
   ci:
     if: always()
     permissions:
@@ -202,6 +223,7 @@ jobs:
       - build-playwright
       - build-kafka
       - build-pulsar
+      - build-eventhubs
     runs-on: ubuntu-latest
     steps:
       - name: Check CI results
@@ -215,6 +237,7 @@ jobs:
             "${{ needs.build-playwright.result }}"
             "${{ needs.build-kafka.result }}"
             "${{ needs.build-pulsar.result }}"
+            "${{ needs.build-eventhubs.result }}"
           )
           for result in "${results[@]}"; do
             if [ "$result" == "failure" ] || [ "$result" == "cancelled" ]; then
