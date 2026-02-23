@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gherkin-testcontainers-kafka"
+version = "0.1.0"
+description = "Kafka plugin for gherkin-testcontainers"
+requires-python = ">=3.11"
+dependencies = [
+    "gherkin-testcontainers>=0.1.0",
+    "testcontainers[kafka]>=4.0.0",
+    "kafka-python-ng>=2.0",
+]
+
+[project.entry-points."gherkin_testcontainers.plugins"]
+kafka = "gherkin_testcontainers_kafka:KafkaPlugin"
