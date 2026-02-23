@@ -21,6 +21,8 @@ jobs:
       kafka: ${{ steps.filter.outputs.kafka }}
       pulsar: ${{ steps.filter.outputs.pulsar }}
       eventhubs: ${{ steps.filter.outputs.eventhubs }}
+      google_pubsub: ${{ steps.filter.outputs.google_pubsub }}
+      iggy: ${{ steps.filter.outputs.iggy }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -49,6 +51,10 @@ jobs:
               - 'plugins/pulsar/**'
             eventhubs:
               - 'plugins/eventhubs/**'
+            google_pubsub:
+              - 'plugins/google_pubsub/**'
+            iggy:
+              - 'plugins/iggy/**'
 
   build-core:
     needs: detect-changes
@@ -64,7 +70,7 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
       - name: Run tests
-        run: pytest tests/unit/ -v --ignore=tests/unit/test_sqlite_plugin.py --ignore=tests/unit/test_postgres_plugin.py --ignore=tests/unit/test_oracle_plugin.py --ignore=tests/unit/test_mariadb_plugin.py --ignore=tests/unit/test_playwright_plugin.py --ignore=tests/unit/test_kafka_plugin.py --ignore=tests/unit/test_pulsar_plugin.py --ignore=tests/unit/test_eventhubs_plugin.py
+        run: pytest tests/unit/ -v --ignore=tests/unit/test_sqlite_plugin.py --ignore=tests/unit/test_postgres_plugin.py --ignore=tests/unit/test_oracle_plugin.py --ignore=tests/unit/test_mariadb_plugin.py --ignore=tests/unit/test_playwright_plugin.py --ignore=tests/unit/test_kafka_plugin.py --ignore=tests/unit/test_pulsar_plugin.py --ignore=tests/unit/test_google_pubsub_plugin.py --ignore=tests/unit/test_iggy_plugin.py --ignore=tests/unit/test_eventhubs_plugin.py
 
   build-sqlite:
     needs: detect-changes
@@ -191,7 +197,7 @@ jobs:
           pip install -e plugins/pulsar
       - name: Run tests
         run: pytest tests/unit/test_pulsar_plugin.py -v
-
+  
   build-eventhubs:
     needs: detect-changes
     if: needs.detect-changes.outputs.eventhubs == 'true'
@@ -210,6 +216,42 @@ jobs:
       - name: Run tests
         run: pytest tests/unit/test_eventhubs_plugin.py -v
 
+  build-google-pubsub:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.google_pubsub == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+          pip install -e plugins/google_pubsub
+      - name: Run tests
+        run: pytest tests/unit/test_google_pubsub_plugin.py -v
+
+  build-iggy:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.iggy == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+          pip install -e plugins/iggy
+      - name: Run tests
+        run: pytest tests/unit/test_iggy_plugin.py -v
+
   ci:
     if: always()
     permissions:
@@ -224,6 +266,8 @@ jobs:
       - build-kafka
       - build-pulsar
       - build-eventhubs
+      - build-google-pubsub
+      - build-iggy
     runs-on: ubuntu-latest
     steps:
       - name: Check CI results
@@ -238,6 +282,8 @@ jobs:
             "${{ needs.build-kafka.result }}"
             "${{ needs.build-pulsar.result }}"
             "${{ needs.build-eventhubs.result }}"
+            "${{ needs.build-google-pubsub.result }}"
+            "${{ needs.build-iggy.result }}"
           )
           for result in "${results[@]}"; do
             if [ "$result" == "failure" ] || [ "$result" == "cancelled" ]; then

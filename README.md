@@ -16,6 +16,8 @@ pip install gherkin-testcontainers-playwright
 pip install gherkin-testcontainers-kafka
 pip install gherkin-testcontainers-pulsar
 pip install gherkin-testcontainers-eventhubs
+pip install gherkin-testcontainers-google-pubsub
+pip install gherkin-testcontainers-iggy
 ```
 
 ## Quick Start
@@ -145,6 +147,8 @@ Optional lifecycle hooks are available via `on_start(container)` and `on_stop(co
 | `gherkin-testcontainers-kafka` | Apache Kafka | `kafka.KafkaProducer` |
 | `gherkin-testcontainers-pulsar` | Apache Pulsar | `pulsar.Client` |
 | `gherkin-testcontainers-eventhubs` | Azure Event Hubs (emulator) | `azure.eventhub.EventHubProducerClient` |
+| `gherkin-testcontainers-google-pubsub` | Google Cloud Pub/Sub emulator | `google.cloud.pubsub_v1.PublisherClient` |
+| `gherkin-testcontainers-iggy` | Iggy message streaming | `iggy_py.IggyClient` |
 
 ## Playwright Integration
 
@@ -352,7 +356,7 @@ git clone <repo>
 cd gherkin-testcontainers
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-pip install -e plugins/sqlite -e plugins/postgres -e plugins/mariadb --no-deps -e plugins/oracle -e plugins/kafka -e plugins/pulsar -e plugins/eventhubs
+pip install -e plugins/sqlite -e plugins/postgres -e plugins/mariadb --no-deps -e plugins/oracle -e plugins/kafka -e plugins/pulsar -e plugins/google_pubsub -e plugins/iggy -e plugins/eventhubs
 
 # Run tests
 pytest tests/unit/ -v
