@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gherkin-testcontainers-eventhubs"
+version = "0.1.0"
+description = "Azure Event Hubs emulator plugin for gherkin-testcontainers"
+requires-python = ">=3.11"
+dependencies = [
+    "gherkin-testcontainers>=0.1.0",
+    "testcontainers[azurite]>=4.0.0",
+    "azure-eventhub>=5.0.0",
+]
+
+[project.entry-points."gherkin_testcontainers.plugins"]
+eventhubs = "gherkin_testcontainers_eventhubs:EventHubsPlugin"

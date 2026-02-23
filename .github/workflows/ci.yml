@@ -20,6 +20,7 @@ jobs:
       playwright: ${{ steps.filter.outputs.playwright }}
       kafka: ${{ steps.filter.outputs.kafka }}
       pulsar: ${{ steps.filter.outputs.pulsar }}
+      eventhubs: ${{ steps.filter.outputs.eventhubs }}
       google_pubsub: ${{ steps.filter.outputs.google_pubsub }}
       iggy: ${{ steps.filter.outputs.iggy }}
     steps:
@@ -48,6 +49,8 @@ jobs:
               - 'plugins/kafka/**'
             pulsar:
               - 'plugins/pulsar/**'
+            eventhubs:
+              - 'plugins/eventhubs/**'
             google_pubsub:
               - 'plugins/google_pubsub/**'
             iggy:
@@ -67,7 +70,7 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev]"
       - name: Run tests
-        run: pytest tests/unit/ -v --ignore=tests/unit/test_sqlite_plugin.py --ignore=tests/unit/test_postgres_plugin.py --ignore=tests/unit/test_oracle_plugin.py --ignore=tests/unit/test_mariadb_plugin.py --ignore=tests/unit/test_playwright_plugin.py --ignore=tests/unit/test_kafka_plugin.py --ignore=tests/unit/test_pulsar_plugin.py --ignore=tests/unit/test_google_pubsub_plugin.py --ignore=tests/unit/test_iggy_plugin.py
+        run: pytest tests/unit/ -v --ignore=tests/unit/test_sqlite_plugin.py --ignore=tests/unit/test_postgres_plugin.py --ignore=tests/unit/test_oracle_plugin.py --ignore=tests/unit/test_mariadb_plugin.py --ignore=tests/unit/test_playwright_plugin.py --ignore=tests/unit/test_kafka_plugin.py --ignore=tests/unit/test_pulsar_plugin.py --ignore=tests/unit/test_google_pubsub_plugin.py --ignore=tests/unit/test_iggy_plugin.py --ignore=tests/unit/test_eventhubs_plugin.py
 
   build-sqlite:
     needs: detect-changes
@@ -194,6 +197,24 @@ jobs:
           pip install -e plugins/pulsar
       - name: Run tests
         run: pytest tests/unit/test_pulsar_plugin.py -v
+  
+  build-eventhubs:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.eventhubs == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev]"
+          pip install -e plugins/eventhubs
+      - name: Run tests
+        run: pytest tests/unit/test_eventhubs_plugin.py -v
 
   build-google-pubsub:
     needs: detect-changes
@@ -244,6 +265,7 @@ jobs:
       - build-playwright
       - build-kafka
       - build-pulsar
+      - build-eventhubs
       - build-google-pubsub
       - build-iggy
     runs-on: ubuntu-latest
@@ -259,6 +281,7 @@ jobs:
             "${{ needs.build-playwright.result }}"
             "${{ needs.build-kafka.result }}"
             "${{ needs.build-pulsar.result }}"
+            "${{ needs.build-eventhubs.result }}"
             "${{ needs.build-google-pubsub.result }}"
             "${{ needs.build-iggy.result }}"
           )

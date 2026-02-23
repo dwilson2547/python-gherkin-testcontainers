@@ -15,6 +15,7 @@ pip install gherkin-testcontainers-oracle
 pip install gherkin-testcontainers-playwright
 pip install gherkin-testcontainers-kafka
 pip install gherkin-testcontainers-pulsar
+pip install gherkin-testcontainers-eventhubs
 pip install gherkin-testcontainers-google-pubsub
 pip install gherkin-testcontainers-iggy
 ```
@@ -96,7 +97,7 @@ gherkin-testcontainers core
   ├── @use_container    (step decorator, client injection)
   └── PluginRegistry    (entry_points auto-discovery)
          |
-Plugins (postgres, sqlite, mariadb, oracle, kafka, pulsar, ...)
+Plugins (postgres, sqlite, mariadb, oracle, kafka, pulsar, eventhubs, ...)
 Each implements ContainerPlugin ABC
          |
 testcontainers-python / Docker
@@ -145,6 +146,7 @@ Optional lifecycle hooks are available via `on_start(container)` and `on_stop(co
 | `gherkin-testcontainers-playwright` | Playwright browser (no Docker) | `playwright.sync_api.Page` |
 | `gherkin-testcontainers-kafka` | Apache Kafka | `kafka.KafkaProducer` |
 | `gherkin-testcontainers-pulsar` | Apache Pulsar | `pulsar.Client` |
+| `gherkin-testcontainers-eventhubs` | Azure Event Hubs (emulator) | `azure.eventhub.EventHubProducerClient` |
 | `gherkin-testcontainers-google-pubsub` | Google Cloud Pub/Sub emulator | `google.cloud.pubsub_v1.PublisherClient` |
 | `gherkin-testcontainers-iggy` | Iggy message streaming | `iggy_py.IggyClient` |
 
@@ -298,6 +300,55 @@ def step_consume(context, msg, topic):
     consumer.acknowledge(received)
 ```
 
+## Azure Event Hubs Integration
+
+The `eventhubs` plugin starts an [Azure Event Hubs emulator](https://github.com/Azure/azure-event-hubs-emulator-installer) container (backed by Azurite for storage) and injects an `azure.eventhub.EventHubProducerClient`. The emulator uses a default namespace (`emulatorNs1`) and event hub (`eh1`), which can be overridden via a custom `Config.json` volume mount.
+
+### Installation
+
+```bash
+pip install gherkin-testcontainers-eventhubs
+```
+
+### Example
+
+```gherkin
+# features/eventhubs.feature
+Feature: Azure Event Hubs messaging
+
+  Scenario: Send an event
+    Given a running Event Hubs emulator
+    When I send the event "hello"
+    Then the event hub should have received the event
+```
+
+```python
+# features/steps/eventhubs_steps.py
+from behave import given, when, then
+from gherkin_testcontainers import use_container
+from azure.eventhub import EventData, EventHubConsumerClient
+
+@given("a running Event Hubs emulator")
+@use_container("eventhubs")
+def step_eventhubs(context, eventhubs_client):
+    # eventhubs_client is an azure.eventhub.EventHubProducerClient
+    context.producer = eventhubs_client
+
+@when('I send the event "{msg}"')
+def step_send(context, msg):
+    with context.producer:
+        batch = context.producer.create_batch()
+        batch.add(EventData(msg))
+        context.producer.send_batch(batch)
+
+@then("the event hub should have received the event")
+def step_check(context):
+    # consume and verify using EventHubConsumerClient
+    pass
+```
+
+The default connection string targets the `eh1` event hub in the `emulatorNs1` namespace. To target a different event hub, call `container.get_connection_string(eventhub_name="my-hub")`.
+
 ## Development
 
 ```bash
@@ -305,7 +356,7 @@ git clone <repo>
 cd gherkin-testcontainers
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-pip install -e plugins/sqlite -e plugins/postgres -e plugins/mariadb --no-deps -e plugins/oracle -e plugins/kafka -e plugins/pulsar -e plugins/google_pubsub -e plugins/iggy
+pip install -e plugins/sqlite -e plugins/postgres -e plugins/mariadb --no-deps -e plugins/oracle -e plugins/kafka -e plugins/pulsar -e plugins/google_pubsub -e plugins/iggy -e plugins/eventhubs
 
 # Run tests
 pytest tests/unit/ -v
